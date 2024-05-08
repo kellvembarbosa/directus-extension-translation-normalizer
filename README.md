@@ -1,1 +1,1 @@
-# directus-translation-normalizer
+# directus-extension-translation-normalizer
