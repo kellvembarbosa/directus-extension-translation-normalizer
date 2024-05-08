@@ -1,0 +1,35 @@
+{
+	"name": "directus-translation-normalizer",
+	"description": "Please enter a description for your extension",
+	"icon": "extension",
+	"version": "1.0.0",
+	"keywords": [
+		"directus",
+		"directus-extension",
+		"directus-extension-hook"
+	],
+	"type": "module",
+	"files": [
+		"dist"
+	],
+	"directus:extension": {
+		"type": "hook",
+		"path": "dist/index.js",
+		"source": "src/index.ts",
+		"host": "^10.10.0"
+	},
+	"scripts": {
+		"build": "directus-extension build",
+		"dev": "directus-extension build -w --no-minify",
+		"link": "directus-extension link"
+	},
+	"devDependencies": {
+		"@directus/extensions-sdk": "11.0.3",
+		"@types/node": "^20.12.8",
+		"typescript": "^5.4.5"
+	},
+	"dependencies": {
+		"@directus/errors": "^0.2.4",
+		"advanced-url-search-params": "^1.1.0"
+	}
+}
