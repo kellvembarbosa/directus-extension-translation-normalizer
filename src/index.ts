@@ -53,8 +53,6 @@ export default defineHook((register, { env }) => {
 		const processedData = extractor.process(payload);
 		return processedData;
 	});
-
-
 });
 
 interface TranslationExtractorOptions {
