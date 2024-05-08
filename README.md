@@ -1,0 +1,1 @@
+# directus-translation-normalizer
