@@ -10,6 +10,13 @@ export default defineHook((register, { env }) => {
 			console.log("=========> Middleware before hook called for normalize translations: <=========");
 
 			// check method is GET or POST
+			// support only GET method
+			if (_req.method !== "GET") {
+				next();
+				return;
+			}
+
+			// check method is GET or POST
 			const localeValue = _req.method === "GET" ? _req.query.locale as string | undefined : _req.body.locale as string | undefined;
 			const fallbackLocaleValue = _req.method === "GET" ? _req.query.fallbackLocale as string | undefined : _req.body.fallbackLocale as string | undefined;
 			const translationKeys = _req.method === "GET" ? _req.query.translationKeys as string | undefined : _req.body.translationKeys as string | undefined;
