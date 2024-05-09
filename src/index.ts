@@ -34,8 +34,8 @@ export default defineHook((register, { env }) => {
 					replaceOtherFields: replaceOtherFields === "true",
 					translationKeys: JSON.stringify(translationKeys == undefined ? { default: ["translations"] } : JSON.parse(translationKeys))
 				};
+				next();
 			}
-			next();
 		});
 	});
 
