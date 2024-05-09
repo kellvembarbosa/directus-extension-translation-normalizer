@@ -7,38 +7,34 @@ export default defineHook((register, { env }) => {
 
 	init('middlewares.after', ({ app }: Record<'app', Application>) => {
 		app.use((_req, _res, next) => {
-			console.log("=========> Middleware before hook called for normalize translations: <=========");
 
 			// check method is GET or POST
 			// support only GET method
 			if (_req.method !== "GET") {
 				next();
-				return;
-			}
+			} else {
+				console.log("=========> Middleware before hook called for normalize translations: <=========");
 
-			// check method is GET or POST
-			const localeValue = _req.method === "GET" ? _req.query.locale as string | undefined : _req.body.locale as string | undefined;
-			const fallbackLocaleValue = _req.method === "GET" ? _req.query.fallbackLocale as string | undefined : _req.body.fallbackLocale as string | undefined;
-			const translationKeys = _req.method === "GET" ? _req.query.translationKeys as string | undefined : _req.body.translationKeys as string | undefined;
-			const replaceIdField = _req.method === "GET" ? _req.query.replaceIdField as string | undefined : _req.body.replaceIdField as string | undefined;
-			const replaceOtherFields = _req.method === "GET" ? _req.query.replaceOtherFields as string | undefined : _req.body.replaceOtherFields as string | undefined;
-			const removeOriginalTranslationKey = _req.method === "GET" ? _req.query.removeOriginalTranslationKey as string | undefined : _req.body.removeOriginalTranslationKey as string | undefined;
+				// check method is GET or POST
+				const localeValue = _req.query.locale as string | undefined
+				const fallbackLocaleValue = _req.query.fallbackLocale as string | undefined
+				const translationKeys = _req.query.translationKeys as string | undefined
+				const replaceIdField = _req.query.replaceIdField as string | undefined
+				const replaceOtherFields = _req.query.replaceOtherFields as string | undefined
+				const removeOriginalTranslationKey = _req.query.removeOriginalTranslationKey as string | undefined
 
-
-			// console.log("middleware", translationKeys)
-
-			// @ts-ignore
-			_req.accountability = {
 				// @ts-ignore
-				..._req.accountability,
-				locale: localeValue,
-				fallbackLocale: fallbackLocaleValue,
-				removeOriginalTranslationKey: removeOriginalTranslationKey == undefined ? true : removeOriginalTranslationKey === "true",
-				replaceIdField: replaceIdField === "true",
-				replaceOtherFields: replaceOtherFields === "true",
-				translationKeys: JSON.stringify(translationKeys == undefined ? { default: ["translations"] } : JSON.parse(translationKeys))
-			};
-
+				_req.accountability = {
+					// @ts-ignore
+					..._req.accountability,
+					locale: localeValue,
+					fallbackLocale: fallbackLocaleValue,
+					removeOriginalTranslationKey: removeOriginalTranslationKey == undefined ? true : removeOriginalTranslationKey === "true",
+					replaceIdField: replaceIdField === "true",
+					replaceOtherFields: replaceOtherFields === "true",
+					translationKeys: JSON.stringify(translationKeys == undefined ? { default: ["translations"] } : JSON.parse(translationKeys))
+				};
+			}
 			next();
 		});
 	});
