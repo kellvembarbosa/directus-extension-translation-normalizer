@@ -1,18 +1,12 @@
 import { defineHook } from '@directus/extensions-sdk';
 import type { Application } from 'express';
 
-export default defineHook((register, { env }) => {
-
-	const { filter, init } = register;
+export default defineHook(({ filter, init }, { env }) => {
 
 	init('middlewares.after', ({ app }: Record<'app', Application>) => {
 		app.use((_req, _res, next) => {
 
-			// check method is GET or POST
-			// support only GET method
-			if (_req.method !== "GET") {
-				next();
-			} else {
+			if (_req.method == "GET" && _req.query.locale !== undefined) {
 				console.log("=========> Middleware before hook called for normalize translations: <=========");
 
 				// check method is GET or POST
@@ -22,7 +16,7 @@ export default defineHook((register, { env }) => {
 				const replaceIdField = _req.query.replaceIdField as string | undefined
 				const replaceOtherFields = _req.query.replaceOtherFields as string | undefined
 				const removeOriginalTranslationKey = _req.query.removeOriginalTranslationKey as string | undefined
-
+				
 				// @ts-ignore
 				_req.accountability = {
 					// @ts-ignore
@@ -35,25 +29,23 @@ export default defineHook((register, { env }) => {
 					translationKeys: JSON.stringify(translationKeys == undefined ? { default: ["translations"] } : JSON.parse(translationKeys))
 				};
 				next();
+			} else {
+				next();
 			}
 		});
 	});
 
 	// This hook is called when a new item is created
-	filter('*.items.read', async (payload, meta, context) => {
-
+	filter('*.items.read', async (payload, meta, context : any) => {
+		
 		const { accountability } = context;
-		const { locale, fallbackLocale, removeOriginalTranslationKey, replaceIdField, replaceOtherFields, translationKeys }: any = accountability;
+		if (accountability == undefined || accountability == null || accountability.locale == undefined) return payload;
 		const { collection } = meta;
 
 		const collectionName = collection.toString();
-		if (collectionName.includes("directus_") || !locale) return payload;
+		if (collectionName.includes("directus_")) return payload;
 
-		console.log("Read hook called for collection: ", collection);
-		console.log("locale: ", locale);
-		console.log("fallbackLocale: ", fallbackLocale);
-
-		console.log("translationKeys: ", translationKeys);
+		const { locale, fallbackLocale, removeOriginalTranslationKey, replaceIdField, replaceOtherFields, translationKeys }: any = accountability;
 
 		// Extract the translation data
 		const extractor = new TranslationExtractor({
