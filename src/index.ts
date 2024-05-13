@@ -2,7 +2,6 @@ import { defineHook } from '@directus/extensions-sdk';
 import type { Application } from 'express';
 
 export default defineHook(({ filter, init }, { env }) => {
-
 	init('middlewares.after', ({ app }: Record<'app', Application>) => {
 		app.use((_req, _res, next) => {
 
@@ -12,10 +11,11 @@ export default defineHook(({ filter, init }, { env }) => {
 				// check method is GET or POST
 				const localeValue = _req.query.locale as string | undefined
 				const fallbackLocaleValue = _req.query.fallbackLocale as string | undefined
-				const translationKeys = _req.query.translationKeys as string | undefined
-				const replaceIdField = _req.query.replaceIdField as string | undefined
-				const replaceOtherFields = _req.query.replaceOtherFields as string | undefined
-				const removeOriginalTranslationKey = _req.query.removeOriginalTranslationKey as string | undefined
+				const localizationFields = _req.query.localizationFields as string | undefined
+				const replaceLinkedFields = _req.query.replaceLinkedFields as string | undefined
+				const enablePrimaryFieldId = _req.query.enablePrimaryFieldId as string | undefined
+				const omitSourceLocalizationField = _req.query.omitSourceLocalizationField as string | undefined
+				const useGenericLocale = _req.query.useGenericLocale as string | undefined;
 				
 				// @ts-ignore
 				_req.accountability = {
@@ -23,10 +23,11 @@ export default defineHook(({ filter, init }, { env }) => {
 					..._req.accountability,
 					locale: localeValue,
 					fallbackLocale: fallbackLocaleValue,
-					removeOriginalTranslationKey: removeOriginalTranslationKey == undefined ? true : removeOriginalTranslationKey === "true",
-					replaceIdField: replaceIdField === "true",
-					replaceOtherFields: replaceOtherFields === "true",
-					translationKeys: JSON.stringify(translationKeys == undefined ? { default: ["translations"] } : JSON.parse(translationKeys))
+					omitSourceLocalizationField: omitSourceLocalizationField == undefined ? true : omitSourceLocalizationField === "true",
+					enablePrimaryFieldId: enablePrimaryFieldId == undefined ? true : enablePrimaryFieldId === "true",
+					replaceLinkedFields: replaceLinkedFields === "true",
+					localizationFields: JSON.stringify(localizationFields == undefined ? { default: ["translations"] } : JSON.parse(localizationFields)),
+					useGenericLocale: useGenericLocale === "true",
 				};
 				next();
 			} else {
@@ -45,62 +46,66 @@ export default defineHook(({ filter, init }, { env }) => {
 		const collectionName = collection.toString();
 		if (collectionName.includes("directus_")) return payload;
 
-		const { locale, fallbackLocale, removeOriginalTranslationKey, replaceIdField, replaceOtherFields, translationKeys }: any = accountability;
+		const { locale, fallbackLocale, omitSourceLocalizationField, enablePrimaryFieldId, replaceLinkedFields, localizationFields, useGenericLocale }: any = accountability;
 
 		// Extract the translation data
-		const extractor = new TranslationExtractor({
-			replaceIdField,
-			replaceOtherFields,
-			translationKeys: JSON.parse(translationKeys),
-			removeOriginalTranslationKey,
+		const localizationData = new LocalizationManager({
+			enablePrimaryFieldId: enablePrimaryFieldId,
+			replaceLinkedFields,
+			localizationFields: JSON.parse(localizationFields),
+			omitSourceLocalizationField,
 			languageCodeKey: env.TN_LANGUAGE_CODE_KEY ?? "languages_code",
 			locale,
-			fallbackLocale
+			fallbackLocale,
+			useGenericLocale
 		});
 
-		const processedData = extractor.process(payload);
+		const processedData = localizationData.process(payload);
 		return processedData;
 	});
 });
 
-interface TranslationExtractorOptions {
-	replaceIdField?: boolean;
-	replaceOtherFields?: boolean;
-	translationKeys?: Record<string, string[]>;
-	removeOriginalTranslationKey?: boolean;
+interface LocalizationManagerOptions {
+	enablePrimaryFieldId?: boolean;
+	replaceLinkedFields?: boolean;
+	localizationFields?: Record<string, string[]>;
+	omitSourceLocalizationField?: boolean;
 	fallbackLocale?: string;
 	locale?: string;
 	languageCodeKey?: string;
+	useGenericLocale?: boolean;
 }
 
-class TranslationExtractor {
-	private replaceIdField: boolean;
-	private replaceOtherFields: boolean;
-	private translationKeys: Record<string, string[]>;
-	private removeOriginalTranslationKey: boolean;
+class LocalizationManager {
+	private enablePrimaryFieldId: boolean;
+	private replaceLinkedFields: boolean;
+	private localizationFields: Record<string, string[]>;
+	private omitSourceLocalizationField: boolean;
 	private resultCache: Map<object, object>;
 	private fallbackLocale: string | undefined;
 	private locale?: string;
 	private languageCodeKey: string;
-
+	private useGenericLocale: boolean;
 
 	constructor({
-		replaceIdField = true,
-		replaceOtherFields = false,
-		translationKeys = { default: ["translations"] },
-		removeOriginalTranslationKey = true,
+		enablePrimaryFieldId = true,
+		replaceLinkedFields = false,
+		localizationFields = { default: ["translations"] },
+		omitSourceLocalizationField = true,
 		fallbackLocale,
 		locale = "en-US",
-		languageCodeKey = "languages_code"
-	}: TranslationExtractorOptions = {}) {
-		this.replaceIdField = replaceIdField;
-		this.replaceOtherFields = replaceOtherFields;
-		this.translationKeys = translationKeys;
-		this.removeOriginalTranslationKey = removeOriginalTranslationKey;
+		languageCodeKey = "languages_code",
+		useGenericLocale = false
+	}: LocalizationManagerOptions = {}) {
+		this.enablePrimaryFieldId = enablePrimaryFieldId;
+		this.replaceLinkedFields = replaceLinkedFields;
+		this.localizationFields = localizationFields;
+		this.omitSourceLocalizationField = omitSourceLocalizationField;
 		this.resultCache = new Map();
 		this.locale = locale;
 		this.fallbackLocale = fallbackLocale;
 		this.languageCodeKey = languageCodeKey;
+		this.useGenericLocale = useGenericLocale;
 	}
 
 	public setLocale(value: string): this {
@@ -114,23 +119,28 @@ class TranslationExtractor {
 	}
 
 
-	public setReplaceIdField(value: boolean): this {
-		this.replaceIdField = value;
+	public setEnablePrimaryFieldId(value: boolean): this {
+		this.enablePrimaryFieldId = value;
 		return this;
 	}
 
-	public setReplaceOtherFields(value: boolean): this {
-		this.replaceOtherFields = value;
+	public setReplaceLinkedFields(value: boolean): this {
+		this.replaceLinkedFields = value;
 		return this;
 	}
 
-	public setTranslationKeys(value: Record<string, string[]>): this {
-		this.translationKeys = value;
+	public setLocalizationFields(value: Record<string, string[]>): this {
+		this.localizationFields = value;
 		return this;
 	}
 
-	public setRemoveOriginalTranslationKey(value: boolean): this {
-		this.removeOriginalTranslationKey = value;
+	public setOmitSourceLocalizationField(value: boolean): this {
+		this.omitSourceLocalizationField = value;
+		return this;
+	}
+
+	public setGenericLocale(value: boolean): this {
+		this.useGenericLocale = value;
 		return this;
 	}
 
@@ -149,12 +159,12 @@ class TranslationExtractor {
 		} else if (obj && typeof obj === "object") {
 			result = { ...obj };
 			let keysToRemove: string[] = [];
-			const translationKeys = this.translationKeys[level] || this.translationKeys["default"];
+			const translationKeys = this.localizationFields[level] || this.localizationFields["default"];
 
 			translationKeys?.forEach(key => {
 				const translations = obj[key];
 
-				const primaryTranslation = translations?.find((t: any) => t[this.languageCodeKey] === this.locale);
+				const primaryTranslation = this.findBestMatch(translations, this.locale) //translations?.find((t: any) => t[this.languageCodeKey] === this.locale);
 
 				const fallbackTranslation = this.fallbackLocale ? translations?.find((t: any) => t[this.languageCodeKey] === this.fallbackLocale) : undefined;
 				const translation = primaryTranslation || fallbackTranslation;
@@ -164,14 +174,14 @@ class TranslationExtractor {
 
 				if (translation) {
 					const { id, ...translationWithoutId } = translation;
-					Object.assign(result, this.replaceIdField ? translationWithoutId : { ...translation });
-					if (this.replaceOtherFields) {
+					Object.assign(result, this.enablePrimaryFieldId ? translationWithoutId  : { ...translation });
+					if (this.replaceLinkedFields) {
 						Object.keys(result).forEach(k => {
 							if (key.includes(k)) keysToRemove.push(k);
 						});
 					}
 
-					if (this.removeOriginalTranslationKey) {
+					if (this.omitSourceLocalizationField) {
 						keysToRemove.push(key);
 					}
 				} else {
@@ -191,14 +201,23 @@ class TranslationExtractor {
 		this.resultCache.set(obj, result);
 		return result;
 	}
+
+	private normalizeLocaleCode(locale: string | undefined): string {
+
+			if (!locale) return "";
+
+			const normalized = locale.replace(/[^a-zA-Z0-9]+/g, '').toLowerCase();
+
+			if (this.useGenericLocale) {
+					return normalized.substring(0, normalized.length === 5 ? 3 : 2);
+			}
+			return normalized;
+	}
+
+	private findBestMatch(translations: any[], locale: string | undefined): any {
+			if (!translations) return undefined;
+			
+			const normalizedLocale = this.normalizeLocaleCode(locale);
+			return translations.find(t => this.normalizeLocaleCode(t[this.languageCodeKey]) === normalizedLocale);
+	}
 }
-
-// Usage example:
-// const extractor = new TranslationExtractor({
-//     replaceIdField: true,
-//     replaceOtherFields: false,
-//     translationKeys: { default: ["translations"], post: ["content_translations"] },
-//     removeOriginalTranslationKey: true
-// });
-
-// const processedData = extractor.process(data);
